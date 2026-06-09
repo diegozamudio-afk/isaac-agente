@@ -71,3 +71,18 @@ if loc:
     lon = loc["longitude"]
 else:
     lat, lon = -26.8241, -65.2072 # Ubicación por defecto en caso de error
+    # Importación necesaria
+from streamlit_geolocation import streamlit_geolocation
+
+# ... dentro de tu app, cuando capturás la infracción ...
+loc = streamlit_geolocation()
+
+if loc:
+    lat = loc["latitude"]
+    lon = loc["longitude"]
+else:
+    # Fallback por si el GPS tarda o no tiene señal
+    lat, lon = -26.8241, -65.2072 
+
+# Ahora usás estas variables 'lat' y 'lon' para enviarlas a tu Google Sheets
+hoja.append_row([fecha_actual, patente, dni, infraccion, lat, lon])
