@@ -28,7 +28,7 @@ st.markdown("**Agente en calle:** Operativo Activo")
 st.divider()
 
 # Captura de ubicación única
-loc = streamlit_geolocation(key="mi_ubicacion_unica")
+loc = streamlit_geolocation()
 
 # Widget nativo para activar la cámara
 foto = st.camera_input("📸 Capturar Acta o Patente")
