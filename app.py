@@ -4,7 +4,7 @@ import json
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-
+from streamlit_geolocation import streamlit_geolocation
 # Configuración de la página
 st.set_page_config(page_title="ISAAC Agente", page_icon="📱", layout="centered")
 
