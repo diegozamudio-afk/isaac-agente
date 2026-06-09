@@ -61,3 +61,13 @@ if foto:
                 st.success("🚀 ¡Infracción enviada exitosamente a la base de datos central!")
             except Exception as e:
                 st.error(f"Ocurrió un error al intentar guardar: {e}")
+                from streamlit_geolocation import streamlit_geolocation
+
+# ... dentro de la app ...
+loc = streamlit_geolocation()
+
+if loc:
+    lat = loc["latitude"]
+    lon = loc["longitude"]
+else:
+    lat, lon = -26.8241, -65.2072 # Ubicación por defecto en caso de error
