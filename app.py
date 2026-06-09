@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 import json
 import gspread
 from google.oauth2.service_account import Credentials
@@ -18,22 +17,24 @@ def conectar_sheets():
 st.title("🚓 ISAAC - Terminal Móvil")
 
 # Captura de ubicación
-if "loc" not in st.session_state:
-    st.session_state.loc = streamlit_geolocation()
-loc = st.session_state.loc
+loc = streamlit_geolocation()
+
+if loc and loc.get("latitude") is not None:
+    st.session_state.lat = loc["latitude"]
+    st.session_state.lon = loc["longitude"]
+
+lat = st.session_state.get("lat", -26.8241)
+lon = st.session_state.get("lon", -65.2072)
 
 foto = st.camera_input("📸 Capturar Acta o Patente")
 
 if foto:
     if st.button("🤖 Procesar y Enviar"):
-        with st.spinner("Conectando..."):
-            fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            lat = loc.get("latitude") if loc.get("latitude") else -26.8241
-            lon = loc.get("longitude") if loc.get("longitude") else -65.2072
-            
+        with st.spinner("Enviando..."):
             try:
                 hoja = conectar_sheets()
-                # ENVIAMOS CADA DATO EN UNA CELDA DISTINTA
+                fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                # Se envían lat y lon en columnas E y F separadas
                 hoja.append_row([fecha, "AB 123 CD", "34.567.890", "Mal estacionamiento", lat, lon])
                 st.success("🚀 ¡Infracción enviada!")
             except Exception as e:
