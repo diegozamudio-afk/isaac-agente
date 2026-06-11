@@ -16,9 +16,7 @@ def conectar_sheets():
 
 st.title("🚓 ISAAC - Terminal Móvil")
 
-# Captura de ubicación
 loc = streamlit_geolocation()
-
 if loc and loc.get("latitude") is not None:
     st.session_state.lat = loc["latitude"]
     st.session_state.lon = loc["longitude"]
@@ -26,7 +24,7 @@ if loc and loc.get("latitude") is not None:
 lat = st.session_state.get("lat", -26.8241)
 lon = st.session_state.get("lon", -65.2072)
 
-# --- NUEVO: SELECTOR DE INFRACCIONES ---
+# Selector de infracciones
 opciones = ["Mal estacionamiento", "Rampa discapacitados", "Senda peatonal", "Sin casco", "Sentido contrario"]
 tipo_infraccion = st.selectbox("Seleccionar tipo de infracción:", opciones)
 
@@ -38,11 +36,8 @@ if foto:
             try:
                 hoja = conectar_sheets()
                 fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                
-                # Se envían los datos: 
-                # [Fecha, Patente_dummy, DNI_dummy, Tipo_Elegido, Lat, Lon]
-                hoja.append_row([fecha, "AB 123 CD", "34.567.890", tipo_infraccion, lat, lon])
-                
+                # Asegúrate de que este orden sea idéntico al de tu Hoja 1 de Google Sheets
+                hoja.append_row([fecha, "AB 123 CD", "34.567.890", tipo_infraccion, lat*10000, lon*10000])
                 st.success("🚀 ¡Infracción enviada correctamente!")
             except Exception as e:
                 st.error(f"Error: {e}")
