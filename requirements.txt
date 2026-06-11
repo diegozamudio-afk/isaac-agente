@@ -6,3 +6,5 @@ pandas
 folium
 streamlit-folium
 plotly
+google-auth-oauthlib
+google-auth-httplib2
