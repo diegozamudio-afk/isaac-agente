@@ -1,61 +1,89 @@
+import streamlit as st
+import pandas as pd
 import gspread
 import json
+import plotly.express as px
 from google.oauth2.service_account import Credentials
-from datetime import datetime
 
 # --- CONFIGURACIÓN ---
-# Asegurate de tener tu archivo JSON de credenciales en el servidor
-def get_sheets_client():
-    # Si usas Streamlit Cloud, podrías cargar esto desde st.secrets
-    # Para un script local, podés usar el path al archivo .json
-    with open('credenciales.json') as f:
-        credenciales_dict = json.load(f)
-        
+st.set_page_config(page_title="Dashboard ISAAC", layout="wide")
+
+# Conexión con caché para evitar errores de red
+@st.cache_data(ttl=60)
+def conectar_sheets():
+    # Asegúrate de que el nombre del secreto en Streamlit sea 'gcp_service_account'
+    credenciales_dict = json.loads(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(
         credenciales_dict, 
         scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     )
-    return gspread.authorize(creds)
+    cliente = gspread.authorize(creds)
+    archivo = cliente.open("ISAAC - Monitoreo")
+    return archivo.worksheet("Hoja 1") 
 
-def guardar_infraccion(lat, lon, tipo_infraccion):
-    """
-    Función que el Agente llama al recibir un reporte.
-    """
-    try:
-        cliente = get_sheets_client()
-        archivo = cliente.open("ISAAC - Monitoreo")
-        hoja = archivo.worksheet("Hoja 1")
-        
-        # Obtenemos fecha y hora actual
-        fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Guardamos en la hoja
-        # Asegurate de que el orden de columnas coincida con tu Hoja 1
-        hoja.append_row([fecha, lat, lon, tipo_infraccion])
-        return True
-    except Exception as e:
-        print(f"Error al guardar: {e}")
-        return False
+st.title("📊 Dashboard ISAAC - Inteligencia de Gestión")
 
-# --- LÓGICA DEL AGENTE ---
-# Aquí es donde integrarías la lógica de tu bot de WhatsApp (ej: Twilio o API de Meta)
-def procesar_mensaje_infraccion(mensaje_recibido):
-    """
-    Ejemplo: El mensaje llega como "lat: -268241, lon: -652226, tipo: Sin casco"
-    El agente parsea esto y llama a guardar_infraccion
-    """
-    # Lógica de parsing (simplificada)
-    # En producción usarías regex o una librería de NLP
-    lat = mensaje_recibido.get("lat")
-    lon = mensaje_recibido.get("lon")
-    tipo = mensaje_recibido.get("tipo")
-    
-    if guardar_infraccion(lat, lon, tipo):
-        print("Infracción procesada y guardada correctamente.")
+# --- FORMULARIO DE CARGA ---
+with st.expander("➕ Cargar nueva infracción (Agentes en calle)"):
+    with st.form("form_infraccion"):
+        opciones = ["Mal estacionamiento", "Rampa discapacitados", "Senda peatonal", "Sin casco", "Sentido contrario"]
+        tipo_infraccion = st.selectbox("Seleccionar tipo de infracción:", opciones)
+        lat = st.number_input("Latitud", format="%.6f", value=-26.8241)
+        lon = st.number_input("Longitud", format="%.6f", value=-65.2226)
+        submitted = st.form_submit_button("Guardar Infracción")
+        
+        if submitted:
+            try:
+                hoja = conectar_sheets()
+                hoja.append_row([pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"), lat*10000, lon*10000, tipo_infraccion])
+                st.success("Guardado correctamente")
+            except Exception as e:
+                st.error(f"No se pudo guardar: {e}")
+
+st.markdown("---")
+
+# --- DASHBOARD DE INTELIGENCIA ---
+try:
+    hoja = conectar_sheets()
+    datos = hoja.get_all_records()
+    df = pd.DataFrame(datos)
+
+    if not df.empty:
+        # Limpieza de datos
+        df['lat'] = pd.to_numeric(df['lat'], errors='coerce') / 10000
+        df['lon'] = pd.to_numeric(df['lon'], errors='coerce') / 10000
+        
+        # Tarjetas KPI
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Registros Totales", len(df))
+        col2.metric("Infracciones Hoy", len(df[df['lat'] != 0]))
+        col3.metric("Usuarios CiDi Tuc", "130k")
+        col4.metric("Recaudación Est.", f"${len(df) * 5000:,.0f}")
+
+        st.markdown("---")
+
+        # Visualizaciones
+        st.subheader("📍 Mapa de Calor: Zonas Críticas")
+        st.map(df.dropna(subset=['lat', 'lon']))
+
+        col_izq, col_der = st.columns(2)
+        with col_izq:
+            st.subheader("Distribución por Tipo")
+            if 'tipo' in df.columns:
+                fig_pie = px.pie(df, names='tipo', hole=0.4)
+                st.plotly_chart(fig_pie, use_container_width=True)
+        
+        with col_der:
+            st.subheader("Volumen de Registros")
+            st.bar_chart(df.index)
+
+        with st.expander("Ver Registros Detallados"):
+            st.dataframe(df)
     else:
-        print("Fallo en la comunicación con el sistema.")
+        st.info("La planilla está vacía.")
 
-# Ejemplo de uso
-if __name__ == "__main__":
-    datos_prueba = {"lat": -268241, "lon": -652226, "tipo": "Sin casco"}
-    procesar_mensaje_infraccion(datos_prueba)
+except Exception as e:
+    st.error(f"Error cargando dashboard: {e}")
+
+if st.button("🔄 Actualizar Datos"):
+    st.rerun()
