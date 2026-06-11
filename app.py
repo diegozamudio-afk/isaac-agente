@@ -1,89 +1,70 @@
-import streamlit as st
-import pandas as pd
 import gspread
 import json
-import plotly.express as px
 from google.oauth2.service_account import Credentials
+from datetime import datetime
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Dashboard ISAAC", layout="wide")
-
-# Conexión con caché para evitar errores de red
-@st.cache_data(ttl=60)
-def conectar_sheets():
-    # Asegúrate de que el nombre del secreto en Streamlit sea 'gcp_service_account'
-    credenciales_dict = json.loads(st.secrets["gcp_service_account"])
+# --- CONFIGURACIÓN DE CONEXIÓN ---
+# Asegúrate de tener tu archivo 'credenciales.json' en la misma carpeta que este script
+def get_sheets_client():
+    with open('credenciales.json') as f:
+        credenciales_dict = json.load(f)
+        
     creds = Credentials.from_service_account_info(
         credenciales_dict, 
-        scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets", 
+            "https://www.googleapis.com/auth/drive"
+        ]
     )
-    cliente = gspread.authorize(creds)
-    archivo = cliente.open("ISAAC - Monitoreo")
-    return archivo.worksheet("Hoja 1") 
+    return gspread.authorize(creds)
 
-st.title("📊 Dashboard ISAAC - Inteligencia de Gestión")
-
-# --- FORMULARIO DE CARGA ---
-with st.expander("➕ Cargar nueva infracción (Agentes en calle)"):
-    with st.form("form_infraccion"):
-        opciones = ["Mal estacionamiento", "Rampa discapacitados", "Senda peatonal", "Sin casco", "Sentido contrario"]
-        tipo_infraccion = st.selectbox("Seleccionar tipo de infracción:", opciones)
-        lat = st.number_input("Latitud", format="%.6f", value=-26.8241)
-        lon = st.number_input("Longitud", format="%.6f", value=-65.2226)
-        submitted = st.form_submit_button("Guardar Infracción")
+# --- LÓGICA DE GUARDADO ---
+def guardar_infraccion(lat, lon, tipo_infraccion):
+    """
+    Inserta una nueva fila en Google Sheets.
+    Debe coincidir exactamente con el orden: [fecha, lat, lon, tipo]
+    """
+    try:
+        cliente = get_sheets_client()
+        archivo = cliente.open("ISAAC - Monitoreo")
+        hoja = archivo.worksheet("Hoja 1")
         
-        if submitted:
-            try:
-                hoja = conectar_sheets()
-                hoja.append_row([pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"), lat*10000, lon*10000, tipo_infraccion])
-                st.success("Guardado correctamente")
-            except Exception as e:
-                st.error(f"No se pudo guardar: {e}")
-
-st.markdown("---")
-
-# --- DASHBOARD DE INTELIGENCIA ---
-try:
-    hoja = conectar_sheets()
-    datos = hoja.get_all_records()
-    df = pd.DataFrame(datos)
-
-    if not df.empty:
-        # Limpieza de datos
-        df['lat'] = pd.to_numeric(df['lat'], errors='coerce') / 10000
-        df['lon'] = pd.to_numeric(df['lon'], errors='coerce') / 10000
+        # Obtenemos fecha y hora actual
+        fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Tarjetas KPI
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Registros Totales", len(df))
-        col2.metric("Infracciones Hoy", len(df[df['lat'] != 0]))
-        col3.metric("Usuarios CiDi Tuc", "130k")
-        col4.metric("Recaudación Est.", f"${len(df) * 5000:,.0f}")
+        # Guardamos en la hoja
+        hoja.append_row([fecha, lat, lon, tipo_infraccion])
+        return True
+    except Exception as e:
+        print(f"Error al guardar en Google Sheets: {e}")
+        return False
 
-        st.markdown("---")
-
-        # Visualizaciones
-        st.subheader("📍 Mapa de Calor: Zonas Críticas")
-        st.map(df.dropna(subset=['lat', 'lon']))
-
-        col_izq, col_der = st.columns(2)
-        with col_izq:
-            st.subheader("Distribución por Tipo")
-            if 'tipo' in df.columns:
-                fig_pie = px.pie(df, names='tipo', hole=0.4)
-                st.plotly_chart(fig_pie, use_container_width=True)
-        
-        with col_der:
-            st.subheader("Volumen de Registros")
-            st.bar_chart(df.index)
-
-        with st.expander("Ver Registros Detallados"):
-            st.dataframe(df)
+# --- LÓGICA DEL AGENTE ---
+def procesar_reporte(data):
+    """
+    Función principal para procesar los datos recibidos (ej: desde un bot).
+    'data' debe ser un diccionario con claves: lat, lon, tipo.
+    """
+    lat = data.get("lat")
+    lon = data.get("lon")
+    tipo = data.get("tipo")
+    
+    # Validamos que los datos existen
+    if lat and lon and tipo:
+        resultado = guardar_infraccion(lat, lon, tipo)
+        if resultado:
+            print(f"ÉXITO: Reporte de '{tipo}' guardado en posición {lat}, {lon}")
+        else:
+            print("ERROR: No se pudo guardar el reporte.")
     else:
-        st.info("La planilla está vacía.")
+        print("ERROR: Datos incompletos.")
 
-except Exception as e:
-    st.error(f"Error cargando dashboard: {e}")
-
-if st.button("🔄 Actualizar Datos"):
-    st.rerun()
+# --- EJECUCIÓN DE PRUEBA ---
+if __name__ == "__main__":
+    # Simulación de un dato que llega desde el campo
+    dato_recibido = {
+        "lat": -26.8241, 
+        "lon": -65.2226, 
+        "tipo": "Mal estacionamiento"
+    }
+    procesar_reporte(dato_recibido)
