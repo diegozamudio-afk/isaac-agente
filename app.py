@@ -66,44 +66,30 @@ elif modulo == "Fiscalización Dinámica (LPR)":
     
     patentes_detectadas = ["AB 123 CD", "EF 456 GH", "XX 999 YY (VENCIDO)", "JK 012 LM"]
     
-    # Limpiamos el estado si cambia la patente seleccionada
     patente_escaneada = st.selectbox("Simular detección automática de patente en calle:", patentes_detectadas)
     
-    if 'patente_anterior' != patente_escaneada:
-        st.session_state.confirmado_lpr = False
-        st.session_state.patente_anterior = patente_escaneada
-
-    if st.button("Procesar Patente Detectada"):
-        with st.spinner("Consultando base de datos y generando metadatos..."):
-            st.session_state.lpr_detectada = patente_escaneada
-            st.session_state.mostrar_confirmacion = True
-
-    # Mostramos los resultados y el botón de multa fuera de los botones anidados
-    if st.session_state.get("mostrar_confirmacion", False):
-        st.success(f"Patente capturada al vuelo: **{st.session_state.lpr_detectada}**")
-        st.text(f"Ubicación GPS: Lat: {lat}, Long: {lon}")
-        st.text("Sello de Tiempo: NTP Server Validated")
+    # Mostramos los datos de la patente leída directamente
+    st.success(f"Patente en mira: **{patente_escaneada}**")
+    st.text(f"Ubicación GPS actual: Lat: {lat}, Long: {lon}")
+    st.text("Sello de Tiempo: NTP Server Validated")
+    
+    if "(VENCIDO)" in patente_escaneada:
+        st.error("🔴 ALERTA: Patente sin estacionamiento medido activo.")
+        st.warning("Registro fotográfico tomado automáticamente. El acta queda lista para emitir.")
         
-        if "(VENCIDO)" in st.session_state.lpr_detectada:
-            st.error("🔴 ALERTA: Patente sin estacionamiento medido activo.")
-            st.warning("Registro fotográfico tomado automáticamente. Acta generada para revisión del Tribunal.")
-            
-            if st.button("Confirmar Acta Digital (Un solo toque)"):
-                with st.spinner("Escribiendo acta en base de datos central..."):
-                    try:
-                        hoja = conectar_sheets()
-                        fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                        motivo_lpr = "Estacionamiento Medido Vencido (LPR)"
-                        
-                        # Se inyecta la fila al Google Sheet para que el mapa de calor la lea
-                        hoja.append_row([fecha, st.session_state.lpr_detectada, "S/D", motivo_lpr, lat*10000, lon*10000])
-                        
-                        st.success("Acta emitida correctamente. El sistema no requirió descenso del vehículo.")
-                        st.balloons()
-                        st.session_state.mostrar_confirmacion = False  # Ocultamos el botón tras confirmar
-                        
-                    except Exception as e:
-                        st.error(f"Error al guardar en el servidor: {e}")
-        else:
-            st.success("🟢 Vehículo en regla. Patente registrada en el sistema.")
-            st.session_state.mostrar_confirmacion = False
+        if st.button("Confirmar Acta Digital (Un solo toque)"):
+            with st.spinner("Escribiendo acta en base de datos central (Google Sheets)..."):
+                try:
+                    hoja = conectar_sheets()
+                    fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    motivo_lpr = "Estacionamiento Medido Vencido (LPR)"
+                    
+                    # Se inyecta la fila al Google Sheet
+                    hoja.append_row([fecha, patente_escaneada, "S/D", motivo_lpr, lat*10000, lon*10000])
+                    
+                    st.success("Acta emitida correctamente al servidor. Impactará en el Dashboard.")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Error al guardar en el servidor: {e}")
+    else:
+        st.info("🟢 Vehículo en regla. Patente registrada en el sistema.")
