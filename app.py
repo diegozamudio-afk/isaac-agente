@@ -68,28 +68,33 @@ elif modulo == "Fiscalización Dinámica (LPR)":
     
     patente_escaneada = st.selectbox("Simular detección automática de patente en calle:", patentes_detectadas)
     
-    # Mostramos los datos de la patente leída directamente
-    st.success(f"Patente en mira: **{patente_escaneada}**")
-    st.text(f"Ubicación GPS actual: Lat: {lat}, Long: {lon}")
+    # 1. Guardamos la patente seleccionada en la memoria de sesión
+    st.session_state.patente_actual = patente_escaneada
+    
+    st.success(f"Patente capturada al vuelo: **{st.session_state.patente_actual}**")
+    st.text(f"Ubicación GPS: Lat: {lat}, Long: {lon}")
     st.text("Sello de Tiempo: NTP Server Validated")
     
-    if "(VENCIDO)" in patente_escaneada:
+    if "(VENCIDO)" in st.session_state.patente_actual:
         st.error("🔴 ALERTA: Patente sin estacionamiento medido activo.")
-        st.warning("Registro fotográfico tomado automáticamente. El acta queda lista para emitir.")
+        st.warning("Registro fotográfico tomado automáticamente. Acta generada para revisión del Tribunal.")
         
+        # 2. Botón simple, fuera de sub-botones anidados
         if st.button("Confirmar Acta Digital (Un solo toque)"):
-            with st.spinner("Escribiendo acta en base de datos central (Google Sheets)..."):
+            with st.spinner("Escribiendo acta en base de datos central..."):
                 try:
+                    # Conectamos a la planilla
                     hoja = conectar_sheets()
                     fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                     motivo_lpr = "Estacionamiento Medido Vencido (LPR)"
                     
-                    # Se inyecta la fila al Google Sheet
-                    hoja.append_row([fecha, patente_escaneada, "S/D", motivo_lpr, lat*10000, lon*10000])
+                    # Inyectamos la fila al Google Sheet para que el mapa de calor la lea
+                    hoja.append_row([fecha, st.session_state.patente_actual, "S/D", motivo_lpr, lat*10000, lon*10000])
                     
-                    st.success("Acta emitida correctamente al servidor. Impactará en el Dashboard.")
+                    st.success("Acta emitida correctamente. El sistema no requirió descenso del vehículo.")
                     st.balloons()
+                    
                 except Exception as e:
                     st.error(f"Error al guardar en el servidor: {e}")
     else:
-        st.info("🟢 Vehículo en regla. Patente registrada en el sistema.")
+        st.success("🟢 Vehículo en regla. Patente registrada en el sistema.")
