@@ -41,3 +41,42 @@ if foto:
                 st.success("🚀 ¡Infracción enviada correctamente!")
             except Exception as e:
                 st.error(f"Error: {e}")
+# ==========================================
+# MÓDULO 4: FISCALIZACIÓN EN MOVIMIENTO (LPR)
+# ==========================================
+
+# Asumiendo que ya tienes el menú lateral 'modulo_seleccionado' en tu st.sidebar,
+# simplemente le agregamos la nueva opción a la lista existente.
+# (Recuerda actualizar tu st.sidebar.radio si lo tenías declarado más arriba).
+
+if 'modulo_seleccionado' in locals() or True: # Condición para asegurarlo, adáptalo a tu menú
+    
+    # Suponiendo que tu menú lateral es algo así:
+    # modulo_seleccionado = st.sidebar.radio("Seleccione:", ["Gestión de Expedientes", "Fiscalización QR", "Fiscalización en Movimiento (LPR)"])
+    
+    # Si agregaste la opción en el menú, colocamos la lógica aquí:
+    st.markdown("## 🛵 Fiscalización Dinámica (LPR - Lectura de Patentes)")
+    st.write("Módulo de captura inteligente en movimiento. El agente no detiene su marcha.")
+    
+    st.info("Modo simulación: El sistema procesa lotes de patentes capturadas por la cámara en tiempo real.")
+    
+    # Simulación del buffer de video o ráfaga de imágenes
+    patentes_detectadas = ["AB 123 CD", "EF 456 GH", "XX 999 YY (VENCIDO)", "JK 012 LM"]
+    
+    patente_escaneada = st.selectbox("Simular detección automática de patente en calle:", patentes_detectadas)
+    
+    if st.button("Procesar Patente Detectada"):
+        with st.spinner("Consultando base de datos y generando metadatos..."):
+            st.success(f"Patente capturada al vuelo: **{patente_escaneada}**")
+            st.text("Ubicación GPS: Lat: -26.8241, Long: -65.2226 (Sincronizado)")
+            st.text("Sello de Tiempo: NTP Server Validated")
+            
+            if "(VENCIDO)" in patente_escaneada:
+                st.error("🔴 ALERTA: Patente sin estacionamiento medido activo.")
+                st.warning("Registro fotográfico tomado automáticamente a 20 km/h. Acta generada para revisión del Tribunal.")
+                
+                if st.button("Confirmar Acta Digital (Un solo toque)"):
+                    st.success("Acta emitida correctamente. El sistema no requirió descenso del vehículo.")
+                    st.balloons()
+            else:
+                st.success("🟢 Vehículo en regla. Patente registrada en el sistema.")
